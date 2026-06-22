@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Robot Arm Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🦾 Robot Arm Control</h1>
+            <div class="status-bar">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Disconnected</span>
+                <span class="esp32-badge" id="esp32Badge">ESP32: ?</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="servo-card base-card" data-servo="base">
+                <div class="servo-header">
+                    <span class="servo-icon">🔄</span>
+                    <span class="servo-label">Base Rotation <small>(360°)</small></span>
+                    <span class="servo-value direction-status" id="val-base">⏹ Stop</span>
+                </div>
+                <div class="base-direction-controls">
+                    <button class="btn-dir btn-left" id="btnLeft" title="Hold to Rotate Left">◀ Left</button>
+                    <button class="btn-dir btn-right" id="btnRight" title="Hold to Rotate Right">Right ▶</button>
+                </div>
+                <div class="base-speed-control">
+                    <label class="speed-label">🏎️ Speed: <span id="val-base-speed">30</span>%</label>
+                    <input type="range" class="servo-slider speed-slider" id="slider-base-speed" min="5" max="100" value="30">
+                    <div class="slider-labels">
+                        <span>Lambat</span>
+                        <span>Cepat</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="servo-card" data-servo="updown">
+                <div class="servo-header">
+                    <span class="servo-icon">⬆️⬇️</span>
+                    <span class="servo-label">Arm Up/Down</span>
+                    <span class="servo-value" id="val-updown">90°</span>
+                </div>
+                <input type="range" class="servo-slider" id="slider-updown" min="0" max="180" value="90">
+                <div class="slider-labels">
+                    <span>0°</span>
+                    <span>180°</span>
+                </div>
+            </div>
+
+            <div class="servo-card" data-servo="arm">
+                <div class="servo-header">
+                    <span class="servo-icon">↔️</span>
+                    <span class="servo-label">Arm Forward/Back</span>
+                    <span class="servo-value" id="val-arm">90°</span>
+                </div>
+                <input type="range" class="servo-slider" id="slider-arm" min="0" max="180" value="90">
+                <div class="slider-labels">
+                    <span>0°</span>
+                    <span>180°</span>
+                </div>
+            </div>
+
+            <div class="servo-card" data-servo="gripper">
+                <div class="servo-header">
+                    <span class="servo-icon">✊</span>
+                    <span class="servo-label">Gripper</span>
+                    <span class="servo-value" id="val-gripper">—</span>
+                </div>
+                <div class="gripper-controls">
+                    <button class="btn-gripper btn-gripper-lepas" id="btnGripperLepas" title="Lepas Gripper (99&#176;)">&#129311; Lepas</button>
+                    <button class="btn-gripper btn-gripper-grip" id="btnGripperGrip" title="Grip Gripper (124&#176;)">&#129294; Grip</button>
+                    <button class="btn-gripper btn-gripper-kuat" id="btnGripperKuat" title="Kuat Gripper (140&#176;)">&#128170; Kuat</button>
+                    <button class="btn-gripper btn-gripper-extra" id="btnGripperExtra" title="Extra Kuat Gripper (180&#176;)">&#9889; Extra</button>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-home" id="btnHome">🏠 Home (90°)</button>
+                <button class="btn btn-emergency" id="btnEmergency">🛑 STOP</button>
+            </div>
+            <div class="actions-emergency">
+                <button class="btn btn-resume" id="btnResume">▶️ Resume</button>
+            </div>
+
+            <div class="joystick-panel" id="joystickPanel">
+                <div class="joystick-header">
+                    <span>🎮 Joystick</span>
+                    <span class="js-status" id="jsStatus">❌ Not connected</span>
+                </div>
+                <div class="joystick-name" id="jsName"></div>
+                <div class="axis-grid" id="axisGrid">
+                    <div class="axis-row" data-axis="0">
+                        <span class="axis-label">Left X → Base</span>
+                        <div class="axis-bar-bg"><div class="axis-bar" id="axisBar0"></div></div>
+                        <span class="axis-val" id="axisVal0">90°</span>
+                    </div>
+                    <div class="axis-row" data-axis="1">
+                        <span class="axis-label">Left Y → Up/Down</span>
+                        <div class="axis-bar-bg"><div class="axis-bar" id="axisBar1"></div></div>
+                        <span class="axis-val" id="axisVal1">90°</span>
+                    </div>
+                    <div class="axis-row" data-axis="2">
+                        <span class="axis-label">Right X → Arm</span>
+                        <div class="axis-bar-bg"><div class="axis-bar" id="axisBar2"></div></div>
+                        <span class="axis-val" id="axisVal2">90°</span>
+                    </div>
+                    <div class="axis-row" data-axis="3">
+                        <span class="axis-label">Right Y → Gripper</span>
+                        <div class="axis-bar-bg"><div class="axis-bar" id="axisBar3"></div></div>
+                        <span class="axis-val" id="axisVal3">90°</span>
+                    </div>
+                </div>
+                <div class="deadzone-row">
+                    <label>Deadzone: <span id="deadzoneVal">10</span>%</label>
+                    <input type="range" id="deadzoneSlider" min="0" max="30" value="10">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="mqtt.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
