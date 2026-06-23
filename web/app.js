@@ -114,21 +114,25 @@ function updateEsp32Badge() {
     esp32Badge.className = 'esp32-badge ' + (esp32Connected ? 'esp32-online' : 'esp32-offline');
 }
 
-// ========== Base Direction Buttons (360° — tap to micro-move) ==========
-// Every tap = 0.5s rotation, then auto-stop
-// Speed slider controls how fast each micro-move is
-const MICRO_MOVE_DURATION = 100; // milliseconds
+// ========== Base Direction Buttons (360° — joystick-style press-and-hold) ==========
+// Servo moves while button is held, stops when released
+// LEFT button = CCW rotation, RIGHT button = CW rotation
+// Speed slider controls rotation speed
+
+let baseInterval = null;  // Interval ID for continuous movement
+let baseDirection = null;  // Current direction: 'left', 'right', or null
 
 function getBaseSpeedValue(direction) {
     const pct = parseFloat(speedSlider.value) / 100; // 0.05 - 1.0
-    // Minimum offset = 40 (ensures servo starts moving reliably)
-    // Maximum offset = 90 (full speed, values 0 or 180)
-    const minOffset = 40;
+    // Minimum offset = 30 (smooth low speed)
+    // Maximum offset = 90 (full speed)
+    const minOffset = 30;
     const maxOffset = 90;
     const offset = minOffset + Math.round(pct * (maxOffset - minOffset));
 
-    if (direction === 'left')  return 90 + offset;   // > 90 = CW
-    if (direction === 'right') return 90 - offset;   // < 90 = CCW
+    // FIXED: Left = CCW (<90), Right = CW (>90)
+    if (direction === 'left')  return 90 - offset;   // < 90 = CCW
+    if (direction === 'right') return 90 + offset;    // > 90 = CW
     return 90; // stop
 }
 
@@ -154,25 +158,69 @@ function setBaseVisual(direction) {
     }
 }
 
-function tapBase(direction) {
-    // Send movement command
+function startBase(direction) {
+    // Already moving in this direction
+    if (baseDirection === direction && baseInterval) return;
+
+    // Stop any existing movement first
+    stopBase();
+
+    baseDirection = direction;
     setBaseVisual(direction);
+
+    // Send initial command
     send('base:' + getBaseSpeedValue(direction));
 
-    // Auto-stop after MICRO_MOVE_DURATION
-    setTimeout(() => {
-        stopBase();
-    }, MICRO_MOVE_DURATION);
+    // Continue sending command every 50ms for smooth continuous movement
+    // (Similar to joystick polling in friend's Flutter app)
+    baseInterval = setInterval(() => {
+        if (baseDirection) {
+            send('base:' + getBaseSpeedValue(baseDirection));
+        }
+    }, 50);
 }
 
 function stopBase() {
+    if (baseInterval) {
+        clearInterval(baseInterval);
+        baseInterval = null;
+    }
+    baseDirection = null;
     setBaseVisual('stop');
-    send('base:stop');
+    send('base:90');  // Explicit stop command
 }
 
-// Click events (tap = micro-move)
-btnLeft.addEventListener('click', () => tapBase('left'));
-btnRight.addEventListener('click', () => tapBase('right'));
+// Desktop: press-and-hold with mouse
+btnLeft.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startBase('left');
+});
+
+btnRight.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startBase('right');
+});
+
+btnLeft.addEventListener('mouseup', stopBase);
+btnRight.addEventListener('mouseup', stopBase);
+btnLeft.addEventListener('mouseleave', stopBase);
+btnRight.addEventListener('mouseleave', stopBase);
+
+// Mobile: touch events
+btnLeft.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startBase('left');
+}, { passive: false });
+
+btnRight.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startBase('right');
+}, { passive: false });
+
+btnLeft.addEventListener('touchend', stopBase);
+btnRight.addEventListener('touchend', stopBase);
+btnLeft.addEventListener('touchcancel', stopBase);
+btnRight.addEventListener('touchcancel', stopBase);
 
 // ========== Slider Controls (180° servos) ==========
 Object.keys(sliders).forEach(key => {
