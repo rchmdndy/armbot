@@ -81,9 +81,19 @@ constexpr uint32_t STACK_SERVO   = 2048;
 constexpr uint32_t STACK_STATUS  = 4096;
 
 // FreeRTOS priorities (higher = more important). Arduino loop() = 1.
+//
+// PRIO_SERVO must be HIGHER than PRIO_COMMAND. servoTask ramps 180° servos on
+// a fixed 4ms cadence (vTaskDelayUntil). If it shared a priority with
+// commandTask on the same core (both core 1), FreeRTOS round-robin time-slices
+// them: a burst of MQTT commands would keep commandTask on-CPU and delay the
+// ramp tick, so motion sped up when MQTT was idle and slowed under load — the
+// inconsistent-speed symptom. A higher priority lets the ramp preempt command
+// dispatch. Each tick is tiny (4 servos) and then sleeps, so it never starves
+// commandTask. It equals PRIO_NETWORK but runs on a different core, so no
+// contention there.
 constexpr UBaseType_t PRIO_NETWORK = 3;
 constexpr UBaseType_t PRIO_COMMAND = 2;
-constexpr UBaseType_t PRIO_SERVO   = 2;
+constexpr UBaseType_t PRIO_SERVO   = 3;   // > command: ramp cadence must not be starved
 constexpr UBaseType_t PRIO_STATUS  = 1;
 
 // Core assignment. ESP32: core 0 = WiFi/BT protocol stack, core 1 = app.
