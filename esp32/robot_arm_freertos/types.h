@@ -53,8 +53,8 @@ public:
     // their targets. Returns true if any servo moved (for diagnostics).
     bool rampTick();
 
-    bool isEmergency() const { return _emergency; }
-    void setEmergency(bool e) { _emergency = e; }
+    bool isEmergency() const { return _emergency.load(std::memory_order_acquire); }
+    void setEmergency(bool e) { _emergency.store(e, std::memory_order_release); }
 
     // Snapshot current angle of a servo (last written or target).
     int  currentAngle(ServoId id) const { return _current[id]; }
@@ -69,7 +69,7 @@ private:
     int       _target[SERVO_COUNT] = { HOME_BASE, HOME_UPDOWN, HOME_ARM, HOME_GRIPPER };
     int       _current[SERVO_COUNT]= { HOME_BASE, HOME_UPDOWN, HOME_ARM, HOME_GRIPPER };
     bool      _attached[SERVO_COUNT] = { false, false, false, false };
-    bool      _emergency = false;
+    std::atomic<bool> _emergency{false};   // cross-core: set by cmd task, read by status task
     SemaphoreHandle_t _mutex = nullptr;
 
     // ESP32Servo uses high-precision timers; concurrent attach/write from

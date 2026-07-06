@@ -130,7 +130,6 @@ void networkTask(void* arg) {
     WiFi.setSleep(false);     // disable WiFi power-save for low latency
 
     uint32_t lastMqttAttempt = 0;
-    uint32_t lastStatusPub   = 0;
     int      wifiDebounce    = 0;
     bool     wifiReportedUp  = false;
     char     pubBuf[STATUS_PAYLOAD_MAX];
@@ -175,17 +174,13 @@ void networkTask(void* arg) {
 
             // (3) Drain statusQueue and publish whatever the status task
             //     (or emergency path) queued. Single owner = no race.
+            //     statusTask is the SOLE heartbeat source (every
+            //     STATUS_PERIOD_MS) — networkTask must not also publish a
+            //     periodic "online" here, or the badge gets two competing
+            //     publishers at the same cadence.
             while (xQueueReceive(statusQueue, pubBuf, 0) == pdPASS) {
                 mqttClient.publish(TOPIC_STATUS, pubBuf, true);
                 LOG_MQTT("pub status: %s", pubBuf);
-            }
-
-            // (4) Periodic "online" heartbeat so the web UI badge refreshes
-            //     even when nothing else is flowing. Plain string, retained.
-            uint32_t now = millis();
-            if (now - lastStatusPub >= STATUS_PERIOD_MS) {
-                mqttClient.publish(TOPIC_STATUS, "online", true);
-                lastStatusPub = now;
             }
         }
 

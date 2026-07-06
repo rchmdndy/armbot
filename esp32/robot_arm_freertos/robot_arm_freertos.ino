@@ -11,7 +11,9 @@
  *   servoTask    (core 1, prio 2) - ramps 180° servos toward targets at a
  *                                   fixed cadence (smooth motion, no current
  *                                   spikes). 360° base is set immediately.
- *   statusTask   (core 1, prio 1) - publishes heartbeat/status JSON.
+ *   statusTask   (core 1, prio 1) - hands a plain-string status
+ *                                   ("online"/"emergency") to networkTask via
+ *                                   statusQueue on a fixed cadence.
  *
  * Why this is better than the original single-loop design:
  *   - WiFi/MQTT stay responsive while servos ramp (no delay() blocking loop).
@@ -31,7 +33,9 @@
  *
  * MQTT protocol (unchanged, compatible with existing web UI):
  *   Subscribe:  robot/control    -> "name:value" commands
- *   Publish:    robot/status     -> "online" / JSON heartbeat / "offline" (LWT)
+ *   Publish:    robot/status     -> "online" / "emergency" / "offline" (LWT)
+ *                                   (bare strings only — the web UI keys off
+ *                                   strict `msg === 'online'`, so never JSON)
  *   Commands:   base:<0-180|stop>, updown:<0-180>, arm:<0-180>,
  *               gripper:<0-180>, emergency:STOP|RESUME
  */

@@ -15,6 +15,17 @@
 // servoName() is declared in types.h (included via network.h) and defined
 // in ServoManager.cpp — no forward decl needed here.
 
+// Non-blocking enqueue. parseAndEnqueue() runs in the MQTT callback context
+// on core 0; blocking here (e.g. CMD_QUEUE_WAIT) would stall mqttClient.loop()
+// and could trip the broker keepalive when the queue is momentarily full.
+// A dropped command is safe for servo control — the newest command matters
+// more than a stale queued one. We log the drop so it's visible.
+static inline void enqueueCommand(const Command& cmd) {
+    if (xQueueSend(cmdQueue, &cmd, 0) != pdPASS) {
+        LOG_WARN("cmdQueue full — command dropped");
+    }
+}
+
 // ========== Parse "name:value" into a Command and enqueue ==========
 void parseAndEnqueue(const char* topic, const char* msg) {
     if (strcmp(topic, TOPIC_CONTROL) != 0) return;
@@ -40,7 +51,7 @@ void parseAndEnqueue(const char* topic, const char* msg) {
         cmd.kind = CmdKind::EMERGENCY;
         cmd.flag = (strcmp(valueStr, "STOP") == 0);
         // RESUME = flag=false; anything else we still treat as resume but log.
-        xQueueSend(cmdQueue, &cmd, CMD_QUEUE_WAIT);
+        enqueueCommand(cmd);
         return;
     }
 
@@ -60,7 +71,7 @@ void parseAndEnqueue(const char* topic, const char* msg) {
             cmd.id    = SERVO_BASE;
             cmd.value = val;
         }
-        xQueueSend(cmdQueue, &cmd, CMD_QUEUE_WAIT);
+        enqueueCommand(cmd);
         return;
     }
 
@@ -83,7 +94,7 @@ void parseAndEnqueue(const char* topic, const char* msg) {
     cmd.kind  = CmdKind::SET_SERVO;
     cmd.id    = id;
     cmd.value = angle;
-    xQueueSend(cmdQueue, &cmd, CMD_QUEUE_WAIT);
+    enqueueCommand(cmd);
 }
 
 // ========== Command Dispatcher Task ==========
