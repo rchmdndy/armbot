@@ -1,3 +1,4 @@
+
 /*
  * Robot Arm - ESP32 Firmware (MQTT)
  *
@@ -33,7 +34,7 @@ const char* WIFI_SSID     = "Mine";
 const char* WIFI_PASSWORD = "iqbal12345";
 
 // ========== MQTT Server ==========
-const char* MQTT_SERVER   = "10.226.42.67";
+const char* MQTT_SERVER   = "10.185.170.67";
 const int   MQTT_PORT     = 1883;
 
 // ========== Pin Mapping ==========
@@ -255,21 +256,21 @@ void setupServosStaggered() {
     // Up/Down servo
     servoUpdown.attach(PIN_UPDOWN);
     delay(150);
-    setServoAngle(servoUpdown, 90, "Up/Down");
+    setServoAngle(servoUpdown, 100, "Up/Down");
     delay(300);
     Serial.printf("[SERVO] Up/Down attached to pin %d -> 90°\n", PIN_UPDOWN);
 
     // Arm servo
     servoArm.attach(PIN_ARM);
     delay(150);
-    setServoAngle(servoArm, 90, "Arm");
+    setServoAngle(servoArm, 150, "Arm");
     delay(300);
     Serial.printf("[SERVO] Arm attached to pin %d -> 90°\n", PIN_ARM);
 
     // Gripper servo
     servoGripper.attach(PIN_GRIPPER);
     delay(150);
-    setServoAngle(servoGripper, 90, "Gripper");
+    setServoAngle(servoGripper, 99, "Gripper");
     delay(300);
     Serial.printf("[SERVO] Gripper attached to pin %d -> 90°\n", PIN_GRIPPER);
 

@@ -1,0 +1,10 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+build/
+*.bin
+*.elf
+*.hex
+*.map
+*.eep
+.DS_Store

@@ -1,1 +1,26 @@
-.omc
+# oh-my-claudecode operational artifacts (runtime state, sessions, memory)
+.omc/
+web/.omc/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+**/build/
+
+# Arduino IDE build artifacts
+**/build/
+*.bin
+*.elf
+*.hex
+*.map
+*.eep
+
+# OS / editor
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Stray Windows-path file accidentally committed in initial commit
+C:\FastMCP\boot.log
