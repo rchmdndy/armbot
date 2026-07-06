@@ -52,9 +52,18 @@ constexpr int BASE_STOP_VALUE = 90;
 
 // ========== Smooth Move Tuning (180° servos) ==========
 // Ramping avoids instantaneous 90°->150° jumps that spike current and cause
-// brownouts / jitter. Step 1° every RAMP_STEP_MS = ~250°/s peak.
-constexpr int RAMP_STEP_MS    = 4;     // ms per 1° step
-constexpr int RAMP_STEP_DEG   = 1;     // degrees per step
+// brownouts / jitter.
+//
+// The ramp cadence MUST match the servo PWM refresh period. SG90 runs at
+// 50Hz (setPeriodHertz(50)), so it only latches a new position every 20ms.
+// A faster ramp write() (e.g. every 4ms) stacks 5 updates inside one PWM
+// period; the servo ignores the 4 in-between values and jumps the full 5° in
+// one 20ms frame — visibly jagged/stuttery motion even though the numeric
+// ramp is smooth. Ticking every 20ms means every write() lands on its own
+// PWM frame, so motion is smooth. 5°/20ms = ~250°/s (same peak speed as the
+// old 1°/4ms, just without the wasted, un-actuated sub-steps).
+constexpr int RAMP_STEP_MS    = 20;    // ms per step — matches 50Hz PWM period
+constexpr int RAMP_STEP_DEG   = 5;     // degrees per step (5°/20ms ≈ 250°/s)
 
 // ========== Command Queue ==========
 constexpr int CMD_QUEUE_LEN   = 16;    // commands buffered from MQTT callback
