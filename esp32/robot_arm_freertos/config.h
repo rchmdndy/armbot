@@ -51,19 +51,28 @@ constexpr int HOME_GRIPPER = 99;
 constexpr int BASE_STOP_VALUE = 90;
 
 // ========== Smooth Move Tuning (180° servos) ==========
-// Ramping avoids instantaneous 90°->150° jumps that spike current and cause
-// brownouts / jitter.
+// ADAPTIVE ramp: step magnitude scales with remaining |diff| so big moves
+// transit fast (up to RAMP_MAX_STEP_DEG per tick) and small moves land
+// smoothly (step == |diff| snaps exactly, no overshoot). Removes the old
+// fixed 5°/20ms (~250°/s) cap that made the ramp "chase the slider cursor"
+// and feel sluggish vs the friend's instant-write firmware.
 //
-// The ramp cadence MUST match the servo PWM refresh period. SG90 runs at
-// 50Hz (setPeriodHertz(50)), so it only latches a new position every 20ms.
-// A faster ramp write() (e.g. every 4ms) stacks 5 updates inside one PWM
-// period; the servo ignores the 4 in-between values and jumps the full 5° in
-// one 20ms frame — visibly jagged/stuttery motion even though the numeric
-// ramp is smooth. Ticking every 20ms means every write() lands on its own
-// PWM frame, so motion is smooth. 5°/20ms = ~250°/s (same peak speed as the
-// old 1°/4ms, just without the wasted, un-actuated sub-steps).
-constexpr int RAMP_STEP_MS    = 20;    // ms per step — matches 50Hz PWM period
-constexpr int RAMP_STEP_DEG   = 5;     // degrees per step (5°/20ms ≈ 250°/s)
+// CADENCE vs MAGNITUDE (obs-776): jaggedness was caused by writing FASTER
+// than the 50Hz PWM frame (old 1°/4ms = 5 writes stacked inside one 20ms
+// frame; the servo latched only the last => a 5° jump in one frame = jagged).
+// The fix was aligning the ramp tick to 20ms = exactly 1 write per 20ms
+// frame (phase-locked by servoTask vTaskDelayUntil). Step MAGNITUDE is
+// independent of that: one 20° write per 20ms frame = one 20° latch per
+// frame = smooth, exactly as the shipped 5°/frame fix was smooth. The
+// friend's firmware (arm_servo1.ino) does a single full-magnitude
+// servo.write(90->150) and is smooth + brownout-free on this identical
+// PSU/WiFi/broker (user-confirmed), so big step magnitudes are safe here
+// and our 20°/frame is strictly gentler than the friend's 90°/frame.
+// 20°/20ms = 1000°/s commanded > SG90 mechanical ~400°/s, so the servo —
+// not the firmware — is the speed bottleneck, matching the friend's feel.
+constexpr int RAMP_STEP_MS      = 20;  // ms per tick = 50Hz PWM period (DO NOT change — obs-776 fix)
+constexpr int RAMP_MIN_STEP_DEG = 1;   // |diff|<=this snaps exactly (smooth landing, no overshoot)
+constexpr int RAMP_MAX_STEP_DEG = 20;  // peak step/tick (20°/20ms = 1000°/s commanded, servo-limited)
 
 // ========== Command Queue ==========
 constexpr int CMD_QUEUE_LEN   = 16;    // commands buffered from MQTT callback

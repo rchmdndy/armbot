@@ -106,8 +106,18 @@ bool ServoManager::rampTick() {
         if (!_attached[i])   continue;
         int diff = _target[i] - _current[i];
         if (diff == 0) continue;
-        int step = (diff > 0) ? min(RAMP_STEP_DEG,  diff)
-                              : max(-RAMP_STEP_DEG, diff);
+
+        // ADAPTIVE step: big |diff| -> RAMP_MAX_STEP_DEG (fast transit, kills
+        // the old fixed 250°/s cap); small |diff| -> |diff| (exact snap, no
+        // overshoot). Cadence stays 1 write per 20ms PWM frame (obs-776 fix)
+        // — magnitude never stacks writes within a frame.
+        int adiff = (diff > 0) ? diff : -diff;
+        int stepMag;
+        if (adiff <= RAMP_MIN_STEP_DEG)   stepMag = adiff;                     // exact snap
+        else                             stepMag = (adiff < RAMP_MAX_STEP_DEG)
+                                                 ? adiff : RAMP_MAX_STEP_DEG;  // fast transit
+        int step = (diff > 0) ? stepMag : -stepMag;
+
         _servos[i].write(_current[i] + step);
         _current[i] += step;
         moved = true;

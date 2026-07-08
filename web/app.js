@@ -89,6 +89,35 @@ function send(msg) {
     }
 }
 
+// ========== Publish Coalescing (180° servos) ==========
+// Dragging a slider fires 'input' ~60/s and the gamepad rAF poll sends
+// 180° commands up to 60/s when a stick sweeps. Feeding the firmware ramp
+// that many shifting absolute targets made it "chase the cursor" and feel
+// laggy ("robot stops moving after I stop dragging"). Coalesce 180°
+// publishes to a trailing-edge value every THROTTLE_MS (<=25/s per servo,
+// 2x margin under the 50Hz PWM latch). Visuals update instantly (local,
+// no MQTT) so drag feel stays responsive. 'change' (slider release) flushes
+// the final value synchronously so the released position always lands on
+// the firmware. Base (360° continuous) is change-gated already and stays
+// direct — it is a speed command, not a positional latch.
+const THROTTLE_MS = 40;
+const _pending = {};   // servo key -> last raw value
+const _timer   = {};   // servo key -> pending timeout id
+
+function flushSend(key) {
+    if (_timer[key]) { clearTimeout(_timer[key]); _timer[key] = null; }
+    if (_pending[key] === undefined) return;
+    send(`${key}:${_pending[key]}`);
+    delete _pending[key];
+}
+
+function throttledSend(key, val) {
+    _pending[key] = val;
+    if (!_timer[key]) {
+        _timer[key] = setTimeout(() => { _timer[key] = null; flushSend(key); }, THROTTLE_MS);
+    }
+}
+
 // ========== Status ==========
 function setConnected(connected) {
     statusDot.classList.toggle('connected', connected);
@@ -222,13 +251,16 @@ btnRight.addEventListener('touchend', stopBase);
 btnLeft.addEventListener('touchcancel', stopBase);
 btnRight.addEventListener('touchcancel', stopBase);
 
-// ========== Slider Controls (180° servos) ==========
+// ========== Slider Controls (180° servos) — throttled ==========
 Object.keys(sliders).forEach(key => {
     sliders[key].addEventListener('input', () => {
         const val = sliders[key].value;
-        values[key].textContent = val + '°';
-        send(`${key}:${val}`);
+        values[key].textContent = val + '°';  // instant visual (no MQTT)
+        throttledSend(key, val);              // <=25/s trailing publish
     });
+    // Drag committed (mouseup / keyboard release): flush final value NOW so
+    // the servo's landed position matches the slider exactly.
+    sliders[key].addEventListener('change', () => flushSend(key));
 });
 
 // ========== Gripper Buttons ==========
@@ -381,7 +413,7 @@ function startJoystickLoop() {
                 if (angle !== lastAngles[key]) {
                     lastAngles[key] = angle;
                     changed = true;
-                    send(`gripper:${angle}`);
+                    throttledSend(`gripper`, angle);
                 }
             } else {
                 if (valEl) valEl.textContent = angle + '°';
@@ -390,7 +422,7 @@ function startJoystickLoop() {
                     changed = true;
                     sliders[key].value = angle;
                     values[key].textContent = angle + '°';
-                    send(`${key}:${angle}`);
+                    throttledSend(`${key}`, angle);
                 }
             }
         });
